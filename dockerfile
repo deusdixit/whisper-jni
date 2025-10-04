@@ -12,3 +12,5 @@ COPY build_debian.sh .
 RUN ./build_debian.sh
 ARG RUN_TESTS
 RUN if [ $(echo $RUN_TESTS) ]; then mvn test && echo "Done"; fi
+
+CMD ["echo", "Build image complete."]

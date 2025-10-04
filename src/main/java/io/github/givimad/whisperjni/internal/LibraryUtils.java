@@ -6,19 +6,17 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.InvalidPathException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
+import java.nio.file.*;
 import java.util.Arrays;
 
 
 public class LibraryUtils {
     private static final String TEMP_FOLDER_PREFIX = "whisper-jni-";
     private static Path libraryDir = null;
+
     private LibraryUtils() {
     }
+
     private static void createLibraryFromInputStream(String filename, InputStream is) throws IOException {
         Path libraryPath = libraryDir.resolve(filename);
         try (is) {
@@ -26,76 +24,81 @@ public class LibraryUtils {
         } catch (IOException e) {
             try {
                 Files.delete(libraryPath);
-            } catch (IOException ignored) {}
+            } catch (IOException ignored) {
+            }
             throw e;
         } catch (NullPointerException e) {
             try {
                 Files.delete(libraryPath);
-            } catch (IOException ignored) {}
+            } catch (IOException ignored) {
+            }
             throw new FileNotFoundException("File" + libraryPath + "not found.");
         }
         libraryPath.toFile().deleteOnExit();
     }
+
     /**
      * Loads library from current JAR archive
-     *
+     * <p>
      * The file from JAR is copied into system temporary directory and then loaded. The temporary file is deleted after
      * exiting.
      * Method uses String as filename because the pathname is "abstract", not system-dependent.
      *
      * @param path The path of file inside JAR as absolute path (beginning with '/'), e.g. /package/File.ext
-     * @throws IOException If temporary file creation or read/write operation fails
+     * @throws IOException              If temporary file creation or read/write operation fails
      * @throws IllegalArgumentException If source file (param path) does not exist
      * @throws IllegalArgumentException If the path is not absolute or if the filename is shorter than three characters
-     * (restriction of {@link File#createTempFile(java.lang.String, java.lang.String)}).
-     * @throws FileNotFoundException If the file could not be found inside the JAR.
+     *                                  (restriction of {@link File#createTempFile(java.lang.String, java.lang.String)}).
+     * @throws FileNotFoundException    If the file could not be found inside the JAR.
      */
     private static void copyFromSystem(Path path, String filename, WhisperJNI.LibraryLogger logger) throws IOException {
-        if(libraryDir == null) {
-            libraryDir = createTempDirectory(TEMP_FOLDER_PREFIX);
+        if (libraryDir == null) {
+            libraryDir = createTempDirectory();
         }
         if (null == path) {
             throw new IllegalArgumentException("Missing path.");
         }
-        logger.log("Copping "+ path + " into " + libraryDir.resolve(filename));
+        logger.log("Copping " + path + " into " + libraryDir.resolve(filename));
         try (var is = Files.newInputStream(path)) {
             createLibraryFromInputStream(filename, is);
         }
     }
+
     /**
      * Loads library from current JAR archive
-     *
+     * <p>
      * The file from JAR is copied into system temporary directory and then loaded. The temporary file is deleted after
      * exiting.
      * Method uses String as filename because the pathname is "abstract", not system-dependent.
      *
      * @param path The path of file inside JAR as absolute path (beginning with '/'), e.g. /package/File.ext
-     * @throws IOException If temporary file creation or read/write operation fails
+     * @throws IOException              If temporary file creation or read/write operation fails
      * @throws IllegalArgumentException If source file (param path) does not exist
      * @throws IllegalArgumentException If the path is not absolute or if the filename is shorter than three characters
-     * (restriction of {@link File#createTempFile(java.lang.String, java.lang.String)}).
-     * @throws FileNotFoundException If the file could not be found inside the JAR.
+     *                                  (restriction of {@link File#createTempFile(java.lang.String, java.lang.String)}).
+     * @throws FileNotFoundException    If the file could not be found inside the JAR.
      */
     public static void extractLibraryFromJar(String path, String filename, WhisperJNI.LibraryLogger logger) throws IOException {
-        if(libraryDir == null) {
-            libraryDir = createTempDirectory(TEMP_FOLDER_PREFIX);
+        if (libraryDir == null) {
+            libraryDir = createTempDirectory();
         }
         if (null == path || !path.startsWith("/")) {
             throw new IllegalArgumentException("The path has to be absolute (start with '/').");
         }
-        logger.log("Extracting "+ path + " into " + libraryDir.resolve(filename));
+        logger.log("Extracting " + path + " into " + libraryDir.resolve(filename));
         createLibraryFromInputStream(filename, LibraryUtils.class.getResourceAsStream(path));
     }
-    private static Path createTempDirectory(String prefix) throws IOException {
+
+    private static Path createTempDirectory() throws IOException {
         String tempDir = System.getProperty("java.io.tmpdir");
-        File generatedDir = new File(tempDir, prefix + System.nanoTime());
-        if (!generatedDir.mkdir())
-            throw new IOException("Failed to create temp directory " + generatedDir.getName());
+        File generatedDir = new File(tempDir, LibraryUtils.TEMP_FOLDER_PREFIX + System.nanoTime());
+        if (!generatedDir.mkdir()) throw new IOException("Failed to create temp directory " + generatedDir.getName());
         return Paths.get(generatedDir.getAbsolutePath());
     }
 
     /**
      * Register the native library, should be called at first.
+     *
      * @throws IOException when unable to load the native library
      */
     public static void loadLibrary(WhisperJNI.LibraryLogger logger) throws IOException {
@@ -113,11 +116,14 @@ public class LibraryUtils {
             if (!osName.contains("win")) {
                 LibraryUtils.extractLibraryFromJar(libraryPaths.whisperPath, libraryPaths.whisperFilename, logger);
                 LibraryUtils.extractLibraryFromJar(libraryPaths.ggmlPath, libraryPaths.ggmlFilename, logger);
+                LibraryUtils.extractLibraryFromJar(libraryPaths.ggmlBasePath, libraryPaths.ggmlBaseFilename, logger);
+                LibraryUtils.extractLibraryFromJar(libraryPaths.ggmlCpuPath, libraryPaths.ggmlCpuFilename, logger);
             }
             LibraryUtils.extractLibraryFromJar(libraryPaths.whisperJNIPath, libraryPaths.whisperJNIFilename, logger);
         }
         System.load(libraryDir.resolve(libraryPaths.whisperJNIFilename).toAbsolutePath().toString());
     }
+
     private static LibraryPaths getJarLibraryPaths(WhisperJNI.LibraryLogger logger, boolean customLibraryPath) throws IOException {
         LibraryPaths.Builder builder = new LibraryPaths.Builder();
         String osName = System.getProperty("os.name").toLowerCase();
@@ -125,10 +131,10 @@ public class LibraryUtils {
         if (osName.contains("win")) {
             logger.log("OS detected: Windows.");
             builder.setWhisperJNIFilename("whisper-jni.dll");
-            if(osArch.contains("amd64") || osArch.contains("x86_64")) {
+            if (osArch.contains("amd64") || osArch.contains("x86_64")) {
                 logger.log("Compatible amd64 architecture detected.");
                 logger.log("Looking for whisper.dll in $env:PATH.");
-                if(customLibraryPath || isWhisperDLLInstalled()) {
+                if (customLibraryPath || isWhisperDLLInstalled()) {
                     logger.log("File whisper.dll found, it will be used.");
                     builder.setWhisperJNIPath("/win-amd64/whisper-jni.dll");
                 } else {
@@ -136,47 +142,60 @@ public class LibraryUtils {
                     builder.setWhisperJNIPath("/win-amd64/whisper-jni_full.dll");
                 }
             }
-        } else if (osName.contains("nix") || osName.contains("nux")
-                || osName.contains("aix")) {
+        } else if (osName.contains("nix") || osName.contains("nux") || osName.contains("aix")) {
             logger.log("OS detected: Linux.");
             builder.setWhisperJNIFilename("libwhisper-jni.so");
             builder.setWhisperFilename("libwhisper.so.1");
             builder.setGgmlFilename("libggml.so");
+            builder.setGgmlBaseFilename("libggml-base.so");
+            builder.setGgmlCpuFilename("libggml-cpu.so");
             String cpuInfo;
             try {
                 cpuInfo = Files.readString(Path.of("/proc/cpuinfo"));
             } catch (IOException ignored) {
                 cpuInfo = "";
             }
-            if(osArch.contains("amd64") || osArch.contains("x86_64")) {
+            if (osArch.contains("amd64") || osArch.contains("x86_64")) {
                 logger.log("Compatible amd64 architecture detected.");
                 builder.setWhisperJNIPath("/debian-amd64/libwhisper-jni.so");
                 builder.setWhisperPath("/debian-amd64/libwhisper.so.1");
-                if(cpuInfo.contains("avx2") && cpuInfo.contains("fma") && cpuInfo.contains("f16c") && cpuInfo.contains("avx")) {
+                if (cpuInfo.contains("avx2") && cpuInfo.contains("fma") && cpuInfo.contains("f16c") && cpuInfo.contains("avx")) {
                     logger.log("Using ggml with extra cpu features (mf16c, mfma, mavx, mavx2)");
                     builder.setGgmlPath("/debian-amd64/libggml+mf16c+mfma+mavx+mavx2.so");
+                    builder.setGgmlBasePath("/debian-amd64/libggml-base+mf16c+mfma+mavx+mavx2.so");
+                    builder.setGgmlCpuPath("/debian-amd64/libggml-cpu+mf16c+mfma+mavx+mavx2.so");
                 } else {
                     builder.setGgmlPath("/debian-amd64/libggml.so");
+                    builder.setGgmlPath("/debian-amd64/libggml-base.so");
+                    builder.setGgmlPath("/debian-amd64/libggml-cpu.so");
                 }
-            } else if(osArch.contains("aarch64") || osArch.contains("arm64")) {
+            } else if (osArch.contains("aarch64") || osArch.contains("arm64")) {
                 logger.log("Compatible arm64 architecture detected.");
                 builder.setWhisperJNIPath("/debian-arm64/libwhisper-jni.so");
                 builder.setWhisperPath("/debian-arm64/libwhisper.so.1");
-                if(cpuInfo.contains("fphp")) {
+                if (cpuInfo.contains("fphp")) {
                     logger.log("Using ggml with extra cpu features (fp16)");
                     builder.setGgmlPath("/debian-arm64/libggml+fp16.so");
-                } else if(cpuInfo.contains("crc32")) {
+                    builder.setGgmlPath("/debian-arm64/libggml-base+fp16.so");
+                    builder.setGgmlPath("/debian-arm64/libggml-cpu+fp16.so");
+                } else if (cpuInfo.contains("crc32")) {
                     builder.setGgmlPath("/debian-arm64/libggml.so");
+                    builder.setGgmlPath("/debian-arm64/libggml-base.so");
+                    builder.setGgmlPath("/debian-arm64/libggml-cpu.so");
                 }
-            } else if(osArch.contains("armv7") || osArch.contains("arm")) {
+            } else if (osArch.contains("armv7") || osArch.contains("arm")) {
                 logger.log("Compatible arm architecture detected.");
                 builder.setWhisperJNIPath("/debian-armv7l/libwhisper-jni.so");
                 builder.setWhisperPath("/debian-armv7l/libwhisper.so.1");
-                if(cpuInfo.contains("crc32")) {
+                if (cpuInfo.contains("crc32")) {
                     logger.log("Using ggml with extra cpu features (crc)");
                     builder.setGgmlPath("/debian-armv7l/libggml+crc.so");
+                    builder.setGgmlPath("/debian-armv7l/libggml-base+crc.so");
+                    builder.setGgmlPath("/debian-armv7l/libggml-cpu+crc.so");
                 } else {
                     builder.setGgmlPath("/debian-armv7l/libggml.so");
+                    builder.setGgmlPath("/debian-armv7l/libggml-base.so");
+                    builder.setGgmlPath("/debian-armv7l/libggml-cpu.so");
                 }
             } else {
                 throw new IOException("Unknown OS architecture");
@@ -186,12 +205,12 @@ public class LibraryUtils {
             builder.setWhisperJNIFilename("libwhisper-jni.dylib");
             builder.setWhisperFilename("libwhisper.1.dylib");
             builder.setGgmlFilename("libggml.dylib");
-            if(osArch.contains("amd64") || osArch.contains("x86_64")) {
+            if (osArch.contains("amd64") || osArch.contains("x86_64")) {
                 logger.log("Compatible amd64 architecture detected.");
                 builder.setWhisperJNIPath("/macos-amd64/libwhisper-jni.dylib");
                 builder.setWhisperPath("/macos-amd64/libwhisper.1.dylib");
                 builder.setGgmlPath("/macos-amd64/libggml.dylib");
-            } else if(osArch.contains("aarch64") || osArch.contains("arm64")) {
+            } else if (osArch.contains("aarch64") || osArch.contains("arm64")) {
                 logger.log("Compatible arm64 architecture detected.");
                 builder.setWhisperJNIPath("/macos-arm64/libwhisper-jni.dylib");
                 builder.setWhisperPath("/macos-arm64/libwhisper.1.dylib");
@@ -204,12 +223,9 @@ public class LibraryUtils {
         }
         return builder.build();
     }
+
     private static boolean isWhisperDLLInstalled() {
-        return Arrays
-                .stream(System.getenv("PATH").split(";"))
-                .map(Paths::get)
-                .map(p -> p.resolve("whisper.dll"))
-                .anyMatch(Files::exists);
+        return Arrays.stream(System.getenv("PATH").split(";")).map(Paths::get).map(p -> p.resolve("whisper.dll")).anyMatch(Files::exists);
     }
 
     private static final class LibraryPaths {
@@ -219,14 +235,22 @@ public class LibraryUtils {
         final String whisperFilename;
         final String ggmlFilename;
         final String ggmlPath;
+        final String ggmlBasePath;
+        final String ggmlBaseFilename;
+        final String ggmlCpuPath;
+        final String ggmlCpuFilename;
 
-        private LibraryPaths(String whisperJNIPath, String whisperJNIFilename, String whisperPath, String whisperFilename, String ggmlFilename, String ggmlPath) {
+        private LibraryPaths(String whisperJNIPath, String whisperJNIFilename, String whisperPath, String whisperFilename, String ggmlFilename, String ggmlPath, String ggmlBasePath, String ggmlBaseFilename, String ggmlCpuPath, String ggmlCpuFilename) {
             this.whisperJNIPath = whisperJNIPath;
             this.whisperJNIFilename = whisperJNIFilename;
             this.whisperPath = whisperPath;
             this.whisperFilename = whisperFilename;
             this.ggmlFilename = ggmlFilename;
             this.ggmlPath = ggmlPath;
+            this.ggmlBasePath = ggmlBasePath;
+            this.ggmlBaseFilename = ggmlBaseFilename;
+            this.ggmlCpuPath = ggmlCpuPath;
+            this.ggmlCpuFilename = ggmlCpuFilename;
         }
 
 
@@ -237,31 +261,53 @@ public class LibraryUtils {
             private String whisperFilename;
             private String ggmlFilename;
             private String ggmlPath;
+            private String ggmlBasePath;
+            private String ggmlBaseFilename;
+            private String ggmlCpuPath;
+            private String ggmlCpuFilename;
+
+            public void setGgmlCpuPath(String ggmlCpuPath) {
+                this.ggmlCpuPath = ggmlCpuPath;
+            }
+
+            public void setGgmlCpuFilename(String ggmlCpuFilename) {
+                this.ggmlCpuFilename = ggmlCpuFilename;
+            }
+
+            public void setGgmlBasePath(String ggmlBasePath) {
+                this.ggmlBasePath = ggmlBasePath;
+            }
+
+            public void setGgmlBaseFilename(String ggmlBaseFilename) {
+                this.ggmlBaseFilename = ggmlBaseFilename;
+            }
+
             public void setGgmlFilename(String ggmlFilename) {
                 this.ggmlFilename = ggmlFilename;
             }
+
             public void setGgmlPath(String ggmlPath) {
                 this.ggmlPath = ggmlPath;
             }
+
             public void setWhisperFilename(String whisperFilename) {
                 this.whisperFilename = whisperFilename;
             }
+
             public void setWhisperJNIFilename(String whisperJNIFilename) {
                 this.whisperJNIFilename = whisperJNIFilename;
             }
+
             public void setWhisperJNIPath(String whisperJNIPath) {
                 this.whisperJNIPath = whisperJNIPath;
             }
+
             public void setWhisperPath(String whisperPath) {
                 this.whisperPath = whisperPath;
             }
+
             public LibraryPaths build() {
-                return new LibraryPaths(whisperJNIPath,
-                  whisperJNIFilename,
-                  whisperPath,
-                  whisperFilename,
-                  ggmlFilename,
-                  ggmlPath);
+                return new LibraryPaths(whisperJNIPath, whisperJNIFilename, whisperPath, whisperFilename, ggmlFilename, ggmlPath, ggmlBasePath, ggmlBaseFilename, ggmlCpuPath, ggmlCpuFilename);
             }
         }
 

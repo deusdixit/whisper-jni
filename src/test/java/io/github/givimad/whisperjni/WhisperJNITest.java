@@ -20,11 +20,11 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 public class WhisperJNITest {
-    private static Path testModelPath = Path.of("ggml-tiny.bin");
-    private static Path samplePath = Path.of("src/main/native/whisper/samples/jfk.wav");
-    private static Path sampleAssistantGrammar = Path.of("src/main/native/whisper/grammars/assistant.gbnf");
-    private static Path sampleChessGrammar = Path.of("src/main/native/whisper/grammars/chess.gbnf");
-    private static Path sampleColorsGrammar = Path.of("src/main/native/whisper/grammars/colors.gbnf");
+    private static final Path testModelPath = Path.of("ggml-tiny.bin");
+    private static final Path samplePath = Path.of("src/main/native/whisper/samples/jfk.wav");
+    private static final Path sampleAssistantGrammar = Path.of("src/main/native/whisper/grammars/assistant.gbnf");
+    private static final Path sampleChessGrammar = Path.of("src/main/native/whisper/grammars/chess.gbnf");
+    private static final Path sampleColorsGrammar = Path.of("src/main/native/whisper/grammars/colors.gbnf");
     private static WhisperJNI whisper;
 
     @BeforeAll
@@ -74,9 +74,7 @@ public class WhisperJNITest {
     @Test
     public void testSegmentIndexException() throws IOException {
         var ctx = whisper.init(testModelPath);
-        Exception exception = assertThrows(IndexOutOfBoundsException.class, () -> {
-            whisper.fullGetSegmentText(ctx, 1);
-        });
+        Exception exception = assertThrows(IndexOutOfBoundsException.class, () -> whisper.fullGetSegmentText(ctx, 1));
         ctx.close();
         assertEquals("Index out of range", exception.getMessage());
     }
@@ -86,9 +84,7 @@ public class WhisperJNITest {
         float[] samples = readJFKFileSamples();
         var params = new WhisperFullParams();
         ctx.close();
-        Exception exception = assertThrows(RuntimeException.class, () -> {
-            whisper.full(ctx, params, samples, samples.length);
-        });
+        Exception exception = assertThrows(RuntimeException.class, () -> whisper.full(ctx, params, samples, samples.length));
         assertEquals("Unavailable pointer, object is closed", exception.getMessage());
     }
     @Test
@@ -126,7 +122,7 @@ public class WhisperJNITest {
             int numSegments = whisper.fullNSegments(ctx);
             assertEquals(1, numSegments);
             String text = whisper.fullGetSegmentText(ctx,0);
-            assertEquals(" And so, my fellow Americans, ask not what your country can do for you, ask what you can do for your country.", text);
+            assertEquals(" And so, my fellow Americans ask not what your country can do for you, ask what you can do for your country.", text);
         }
     }
     @Test
@@ -169,7 +165,7 @@ public class WhisperJNITest {
                 int numSegments = whisper.fullNSegmentsFromState(state);
                 assertEquals(1, numSegments);
                 String text = whisper.fullGetSegmentTextFromState(state,0);
-                assertEquals(" And so, my fellow Americans, ask not what your country can do for you, ask what you can do for your country.", text);
+                assertEquals(" And so, my fellow Americans ask not what your country can do for you, ask what you can do for your country.", text);
             }
         }
     }
@@ -198,7 +194,7 @@ public class WhisperJNITest {
     }
 
     @Test
-    public void printSystemInfo() throws Exception {
+    public void printSystemInfo() {
         String whisperCPPSystemInfo = whisper.getSystemInfo();
         assertFalse(whisperCPPSystemInfo.isBlank());
         System.out.println("whisper.cpp library info: " + whisperCPPSystemInfo);

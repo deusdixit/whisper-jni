@@ -7,6 +7,8 @@ build_lib() {
   cmake --build build --config Release
   cmake --install build
   cp $TMP_DIR/libggml.so $TARGET_DIR/libggml$LIB_VARIANT.so
+  cp $TMP_DIR/libggml-base.so $TARGET_DIR/libggml-base$LIB_VARIANT.so
+  cp $TMP_DIR/libggml-cpu.so $TARGET_DIR/libggml-cpu$LIB_VARIANT.so
   if [ "$ADD_WRAPPER" = true ]; then
     cp $TMP_DIR/libwhisper.so.1 $TARGET_DIR/libwhisper.so.1
     cp $TMP_DIR/libwhisper-jni.so $TARGET_DIR/libwhisper-jni.so
