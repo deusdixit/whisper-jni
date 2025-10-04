@@ -63,6 +63,8 @@ endif()
 target_link_libraries(whisper-jni
   whisper
   ggml
+  ggml-base
+  ggml-cpu
 )
 
 target_link_directories(whisper-jni PUBLIC
