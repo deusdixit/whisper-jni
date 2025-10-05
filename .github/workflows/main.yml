@@ -198,6 +198,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      packages: write
     steps:
     - uses: actions/checkout@v4
     - uses: actions/download-artifact@v4
@@ -219,11 +220,7 @@ jobs:
       with:
         java-version: 17
         distribution: 'zulu'
-        server-id: sonatype-nexus-staging
-        server-username: MAVEN_USERNAME
-        server-password: MAVEN_CENTRAL_TOKEN
-        gpg-private-key: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
-        gpg-passphrase: MAVEN_GPG_PASSPHRASE
+        server-id: github
     - name: Deploy with Maven
       id: deploy
       run: |
@@ -233,9 +230,7 @@ jobs:
         echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
         echo "WHISPER_VERSION=$WHISPER_VERSION" >> $GITHUB_OUTPUT
       env:
-        MAVEN_USERNAME: ${{ secrets.OSSRH_USERNAME }}
-        MAVEN_CENTRAL_TOKEN: ${{ secrets.OSSRH_TOKEN }}
-        MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
+        GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
     - name: Release
       uses: softprops/action-gh-release@v1
       id: create_release
