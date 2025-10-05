@@ -224,7 +224,7 @@ jobs:
     - name: Deploy with Maven
       id: deploy
       run: |
-        mvn -B clean deploy -DskipTests -Pci-cd
+        mvn -B clean deploy -DskipTests -Dgpg.skip=true
         VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
         WHISPER_VERSION=$(echo "${VERSION%%"-"*}")
         echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
